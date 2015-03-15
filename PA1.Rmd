@@ -1,0 +1,94 @@
+Peer Assessment 1
+=================
+B. Kelley
+March 11-15, 2015
+
+[Data set obtained on March 11, 2015 from this URL](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)
+
+
+Read in the data from activity.csv after unzipping the download
+
+```{r getdata, echo=TRUE }
+        Dataset<- read.table(file="activity.csv",sep=",", header=TRUE, colClasses=c("numeric","character","numeric"))
+        
+        colnames(Dataset)
+        RowsInOriginalDataset<- nrow(Dataset)
+```
+Now clean Dataset to remove missing values (NA)
+
+```{r cleanDataset, echo=TRUE}
+cleanDataset<- Dataset[complete.cases(Dataset),]
+cleanDataset$date<- as.Date(cleanDataset$date)
+RowsInDatasetNARemoved<- nrow(cleanDataset)
+```
+Calculate the total number of steps taken per day
+and plot a histogram
+
+```{r sumByday, echo=TRUE}
+library("dplyr")
+sumByDay<- group_by(cleanDataset,date) %>% summarize(Nsteps=sum(steps))
+hist(sumByDay$Nsteps,breaks=length(unique(cleanDataset$date)),
+     main="Total Number of Steps Each Day", xlab="Steps",ylab="Number of Days",
+     col=rainbow(10))
+Meansteps<- mean(sumByDay$Nsteps)
+Mediansteps<- median(sumByDay$Nsteps)
+```
+
+Mean steps per day is `r Meansteps`. Median steps per day is `r Mediansteps`.
+
+Now get average of steps across all days for each interval
+
+```{r intervalMean, echo=TRUE}
+intervalMeans<- group_by(cleanDataset, interval) %>% 
+        summarize(avSteps= mean(steps)) %>% arrange(interval)
+
+plot(intervalMeans$interval, intervalMeans$avSteps, xlab="Interval (5 min increments)", ylab="Average Steps",type="l", xlim= c(0,2400))
+```
+```{r missingvaluesrows, echo=TRUE}
+   numRowswithNA<- RowsInOriginalDataset - RowsInDatasetNARemoved
+```
+
+
+The number of rows with missing values is: `r numRowswithNA`
+
+Use the mean steps per day per interval (Meansteps/288) to estimate missing values
+ 
+```{r fillNA, echo=TRUE}
+        NArows<- which(is.na(Dataset))
+        filleddataset<- Dataset
+        filleddataset$steps[NArows]<- Meansteps/288
+
+        sumByDay<- group_by(filleddataset,date) %>% summarize(Nsteps=sum(steps))
+        hist(sumByDay$Nsteps,breaks=length(unique(filleddataset$date)),
+                main="Total Number of Steps Each Day", xlab="Steps",ylab="Number of Days",
+        col=rainbow(10))
+        Meanstepsfill<- mean(sumByDay$Nsteps)
+        Medianstepsfill<- median(sumByDay$Nsteps)
+```
+With NA's filled in with Meansteps/total number of intervals:
+Mean steps per day is `r Meanstepsfill`. Median steps per day is `r Medianstepsfill`.
+
+With this simple strategy, the mean did not change and the median shifted to equal the mean.
+
+Now plot by part of week (weekday/weekend)
+
+```{r dayofweekfactors , echo=TRUE}
+        Weekday<- c("Monday","Tuesday","Wednesday","Thursday","Friday")
+        Weekend<- c("Saturday","Sunday")
+        filleddataset<- mutate(filleddataset, partOfweek= weekdays(as.Date(filleddataset$date)))
+        weekday<- filter(filleddataset, partOfweek == "Monday"|partOfweek=="Tuesday"|partOfweek=="Wednesday"
+                         |partOfweek=="Thursday"|partOfweek=="Friday")
+        weekend<- filter(filleddataset, partOfweek == "Saturday"|partOfweek== "Sunday")
+        
+        weekdayMeans<- group_by(weekday, interval) %>% 
+                summarize(avSteps= mean(steps)) %>% arrange(interval)
+        weekendMeans<- group_by(weekend, interval) %>%
+                summarize(avSteps= mean(steps)) %>% arrange(interval)
+
+        par(mfcol= c(2,1) )
+        plot(weekdayMeans$interval, weekdayMeans$avSteps, ylab="Average Steps",xlab="Interval", 
+             type="l", xlim= c(0,2400), main="weekday")
+        plot(weekendMeans$interval, weekendMeans$avSteps, ylab="Average Steps",xlab="Interval",
+             type="l", xlim= c(0,2400), main="weekend")
+```
+
